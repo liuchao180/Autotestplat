@@ -73,7 +73,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'Autotestplat.wsgi.application'
 
-
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
@@ -81,8 +80,22 @@ DATABASES = {
         'HOST': '127.0.0.1',
         'PORT': 3306,
         'USER': 'root',
-        'PASSWORD': 'test123456'}
+        'PASSWORD': 'Liuzhichao@123',
+        'OPTIONS': {
+            'charset': 'utf8mb4',
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+        },
+    }
 }
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.mysql',
+#         'NAME': 'autotestplat',
+#         'HOST': '127.0.0.1',
+#         'PORT': 3306,
+#         'USER': 'root',
+#         'PASSWORD': 'Liuzhichao@123'}
+# }
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -104,14 +117,14 @@ LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'Asia/Shanghai'
 USE_I18N = True
 USE_L10N = True
-USE_TZ = True
+USE_TZ = False
 
 
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, "autotest").join("static")
+    os.path.join(BASE_DIR, "autotest", "static")
 ]
-
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 MEDIA_URL = "/upload/"
 MEDIA_ROOT = os.path.join(BASE_DIR,'upload')
 
@@ -125,9 +138,18 @@ REDIS_TIMEOUT=7*24*60*60
 CUBES_REDIS_TIMEOUT=60*60
 NEVER_REDIS_TIMEOUT=365*24*60*60
 
-
+# 根据 settings.py 配置，项目使用了 3 个 Redis 数据库：
+# Redis 缓存（CACHES）
+# 地址：redis://127.0.0.1:6379/1
+# 用途：Django 缓存后端
+# Celery Broker
+# 地址：redis://127.0.0.1:6379/0
+# 用途：Celery 任务队列消息代理
+# Celery 结果后端
+# 地址：redis://127.0.0.1:6379/1
+# 用途：存储 Celery 任务执行结果
 CELERY_TIMEZONE = 'Asia/Shanghai'
-CELERY_ENABLE_UTC=True
+CELERY_ENABLE_UTC=False
 # BROKER_URL= 'amqp://root:root@127.0.0.1:5672/of1'   #rabbitmq
 BROKER_URL = 'redis://127.0.0.1:6379/0'
 BROKER_TRANSPORT = 'redis'

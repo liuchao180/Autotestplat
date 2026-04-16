@@ -488,7 +488,7 @@ def start_interface_login(id1):
                 if('select' in body[rec]):
                     try:
                         sql = body[rec]
-                        cursor = connection.cursor()
+                        cursor = conne.cursor()
                         cursor.execute(sql)
                         data = cursor.fetchall()
                         print(u'查询的结果为： ',data[0][0])
@@ -635,14 +635,23 @@ def interface_test_start(url,body,head,mode,body_format,is_out):
         return 1
 
 def request_post(url, body, head, body_format):
-    if (body_format == 'JSON'):
-         body = json.dumps(body)
-    else:
-        keys = body.keys()
-        for rec in keys:
-            if ('[{' in str(body[rec]) and '}]' in str(body[rec])):
-                body = json.dumps(body)
-                break
+    try:
+        if (body_format == 'JSON' or body_format == 'json'):
+            # 检测是否为 JSON 数组
+            if isinstance(body, list):
+                body = json.dumps(body, ensure_ascii=False)  # 序列化 JSON 数组
+            elif isinstance(body, dict):
+                body = json.dumps(body, ensure_ascii=False)  # 序列化 JSON 对象
+        else:
+            # FORM 格式，不需要 json.dumps
+            keys = body.keys()
+            for rec in keys:
+                if ('[{' in str(body[rec]) and '}]' in str(body[rec])):
+                    body = json.dumps(body, ensure_ascii=False)
+                    break
+    except Exception as e:
+        print_log(f'【ERROR】请求体序列化失败：{e}')
+        print_log(f'body_format: {body_format}, body type: {type(body)}')
     r = session.post(url, body, headers=head)
     return r
 

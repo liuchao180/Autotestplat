@@ -68,6 +68,7 @@ def getApiView(req):
     except EmptyPage:
         page_list = paginator.page(paginator.num_pages)
     c = csrf(req)
+    # print(f"DEBUG: product_all query result: {list(product_all.values('id', 'product_name'))}")
     c.update({'page_list': page_list, 'interfaces': interfaces, 'type': type,'num':num,"product_name":product_name,"product_alls":product_all})
     return render_to_response("interface_testcase.html",c)
 
@@ -79,10 +80,10 @@ def loadApiTestcaseTable(request,menu_module_id):
             items = AutotestplatInterfaceTestcase.objects.all().values_list('id','name','mode','url', 'charger','product_id','menu_module_id','create_time').annotate(Count('id')).order_by('-id')
         else:
             user_product_id = AuthUser.objects.filter(username=username).first().last_name
-        if user_product_id:
-            items = AutotestplatInterfaceTestcase.objects.filter(Q(product_id=user_product_id)).values_list('id','name','mode','url', 'charger','product_id','menu_module_id','create_time').annotate(Count('id')).order_by('-id')
-        else:
-            items = AutotestplatInterfaceTestcase.objects.all().values_list('id','name','mode','url', 'charger','product_id','menu_module_id').annotate(Count('id')).order_by('-id')
+            if user_product_id:
+                items = AutotestplatInterfaceTestcase.objects.filter(Q(product_id=user_product_id)).values_list('id','name','mode','url', 'charger','product_id','menu_module_id','create_time').annotate(Count('id')).order_by('-id')
+            else:
+                items = AutotestplatInterfaceTestcase.objects.all().values_list('id','name','mode','url', 'charger','product_id','menu_module_id').annotate(Count('id')).order_by('-id')
     else:
         if AuthUser.objects.filter(username=username).first().is_superuser == 1:
             items = AutotestplatInterfaceTestcase.objects.filter(menu_module_id=menu_module_id).values_list('id','name','mode','url', 'charger','product_id','menu_module_id','create_time').annotate(Count('id')).order_by('-id')
@@ -157,11 +158,27 @@ def modModule(request):
     return HttpResponse('200')
 
 
+# def deleteModule(request):
+#     module_id = request.POST.get('id')
+#     module_name = request.POST.get('module_name')
+#     child_module=AutotestplatModule.objects.filter(parent_module_id=module_id).first()
+#     module_case = AutotestplatInterfaceTestcase.objects.filter(menu_module_id=module_id).first()
+#     if child_module:
+#         return HttpResponse(f'模块"{module_name}"中存在子模块，不能删除')
+#     elif module_case:
+#         return HttpResponse(f'模块"{module_name}"中存在用例，不能删除')
+#     else:
+#         AutotestplatModule.objects.filter(id=module_id).delete()
+#         return HttpResponse('200')
 def deleteModule(request):
     module_id = request.POST.get('id')
     module_name = request.POST.get('module_name')
+    module = AutotestplatModule.objects.filter(id=module_id).first()
     child_module=AutotestplatModule.objects.filter(parent_module_id=module_id).first()
-    module_case = AutotestplatInterfaceTestcase.objects.filter(menu_module_id=module_id).first()
+    if module and module.product_id:
+        module_case = AutotestplatInterfaceTestcase.objects.filter(menu_module_id=module_id, product_id=module.product_id).first()
+    else:
+        module_case = AutotestplatInterfaceTestcase.objects.filter(menu_module_id=module_id).first()
     if child_module:
         return HttpResponse(f'模块"{module_name}"中存在子模块，不能删除')
     elif module_case:
@@ -169,7 +186,6 @@ def deleteModule(request):
     else:
         AutotestplatModule.objects.filter(id=module_id).delete()
         return HttpResponse('200')
-
 
 def showAddWindow(req,menu_module_id):
     head_dict = {'Cookie':'','Accept':'','Content-Type':'application/json; charset=utf-8'}
@@ -620,66 +636,149 @@ def startInterfaceSend(req):
                 if raw_data['interface_body'] != '':
                     try:
                         body = eval(raw_data['interface_body'])
-                        if not isinstance(body, dict):
+                        if not isinstance(body, (dict, list)):
                             return HttpResponse('【ERROR】：' + raw_data['interface_body'] + ' 接口录入信息有误，请重新修改')
                     except:
                         return HttpResponse('【ERROR】：' + raw_data['interface_body'] + ' 接口录入信息有误，请重新修改')
                 else:
                     body = {}
-            for rec in body.keys():
-                if(isinstance(body[rec],str) or isinstance(body[rec],list) or isinstance(body[rec],dict)):
-                    for rec1 in keyword_list1:
-                        if(rec1 in body[rec]):
-                            if('captcha' not in rec1):
-                                body[rec] = body[rec].replace(rec1, public_dict[rec1.replace('{','').replace('}','')])
-                            else:
-                                is_login_api = True
-                                yanzheng_url = public_dict[rec1.replace('{','').replace('}','')]
-                                haha = request_get(yanzheng_url,{},{},0)
-                                with open(codefile,'wb') as f:
-                                    f.write(haha.content)
-                                yanzheng = getcaptcha()
-                                body[rec] = yanzheng
-                                print_log('【登录验证码】：',','),print_log(yanzheng)
-                    for rec5 in keyword_list5:
-                        if (rec5 in str(body[rec])):
+            if isinstance(body, dict):
+                for rec in body.keys():
+                    if(isinstance(body[rec],str) or isinstance(body[rec],list) or isinstance(body[rec],dict)):
+                        for rec1 in keyword_list1:
+                            if(rec1 in body[rec]):
+                                if('captcha' not in rec1):
+                                    body[rec] = body[rec].replace(rec1, public_dict[rec1.replace('{','').replace('}','')])
+                                else:
+                                    is_login_api = True
+                                    yanzheng_url = public_dict[rec1.replace('{','').replace('}','')]
+                                    haha = request_get(yanzheng_url,{},{},0)
+                                    with open(codefile,'wb') as f:
+                                        f.write(haha.content)
+                                    yanzheng = getcaptcha()
+                                    body[rec] = yanzheng
+                                    print_log('【登录验证码】：',','),print_log(yanzheng)
+                                    
+                                    
+                                    
+                                    
+
+                        for rec5 in keyword_list5:
+                            print_log('【DEBUG】检查 rec5: ' + rec5 + ' 是否在 ' + str(body[rec]) + ' 中')
+                            if (rec5 in str(body[rec]) or '{{' + rec5[1:-1] + '}}' in str(body[rec])):
+                                print_log('【DEBUG】匹配成功，rec5: ' + rec5)
+                                try:
+                                    var_name = public_dict[rec5.replace('{', '').replace('}', '')]
+                                    var_value = str(eval(var_name))
+                                    print_log('【DEBUG】var_name: ' + var_name + ', var_value: ' + var_value)
+                                    # 如果是字符串类型，自动添加引号
+                                    if isinstance(eval(var_name), str):
+                                        var_value = '"' + var_value + '"'
+                                        print_log('【DEBUG】添加引号后的 var_value: ' + var_value)
+                                    body_str = str(body)
+                                    print_log('【DEBUG】原始 body_str: ' + body_str)
+                                    # body = str(body).replace(rec5, var_name)
+                                    body_str = body_str.replace('{{' + rec5[1:-1] + '}}', var_value)
+                                    body_str = body_str.replace(rec5, var_value)
+                                    print_log('【DEBUG】替换后的 body_str: ' + body_str)
+                                    body = ast.literal_eval(body_str)
+                                    print_log('【DEBUG】解析后的 body: ' + str(body))
+                                except Exception:
+                                    error_info = traceback.format_exc()
+                                    print(error_info)
+                                    return HttpResponse('【ERROR】：参数 ' + rec5 + ' 没有参数值，请确认系统参数设置是否正确，是否已执行返回 ' + rec5 + ' 的前置接口，以及确认Redis是否已启动')
+                        for rec2 in keyword_list2:
+                            if(rec2 in body[rec]):
+                                try:
+                                    body[rec] = body[rec].replace(rec2, cache.get(rec2.replace('{','').replace('}','')).decode('utf-8'))
+                                except Exception:
+                                    error_info = traceback.format_exc()
+                                    print(error_info)
+                                    return HttpResponse('【ERROR】：参数 '+rec2+' 没有参数值，请确认系统参数设置是否正确，是否已执行返回 '+rec2+' 的前置接口，以及确认Redis是否已启动')
+                        for rec3 in keyword_list3:
+                            if(rec3 in body[rec]):
+                                try:
+                                    body[rec] = body[rec].replace(rec3,cache.get(rec3.replace('{', '').replace('}', '')).decode('utf-8'))
+                                except Exception:
+                                    error_info = traceback.format_exc()
+                                    print(error_info)
+                                    return HttpResponse(
+                                        '【ERROR】：参数 ' + rec3 + ' 没有参数值，请确认系统参数设置是否正确，是否已执行返回 ' + rec3 + ' 的前置接口，以及确认Redis是否已启动')
+                        if('select' in body[rec]):
                             try:
-                                var_name = public_dict[rec5.replace('{', '').replace('}', '')]
-                                var_value = str(eval(var_name))
-                                body = str(body).replace(rec5, var_name)
-                                body = str(body).replace(var_name,var_value)
-                                body=ast.literal_eval(body)
+                                sql = body[rec]
+                                cursor = connection.cursor()
+                                cursor.execute(sql)
+                                data = cursor.fetchall()
+                                print(u'查询的结果为： ',data[0][0])
+                                body[rec] = data[0][0]
                             except Exception:
-                                error_info = traceback.format_exc()
-                                print(error_info)
-                                return HttpResponse('【ERROR】：参数 ' + rec5 + ' 没有参数值，请确认系统参数设置是否正确，是否已执行返回 ' + rec5 + ' 的前置接口，以及确认Redis是否已启动')
-                    for rec2 in keyword_list2:
-                        if(rec2 in body[rec]):
-                            try:
-                                body[rec] = body[rec].replace(rec2, cache.get(rec2.replace('{','').replace('}','')).decode('utf-8'))
-                            except Exception:
-                                error_info = traceback.format_exc()
-                                print(error_info)
-                                return HttpResponse('【ERROR】：参数 '+rec2+' 没有参数值，请确认系统参数设置是否正确，是否已执行返回 '+rec2+' 的前置接口，以及确认Redis是否已启动')
-                    for rec3 in keyword_list3:
-                        if(rec3 in body[rec]):
-                            try:
-                                body[rec] = body[rec].replace(rec3,cache.get(rec3.replace('{', '').replace('}', '')).decode('utf-8'))
-                            except Exception:
-                                error_info = traceback.format_exc()
-                                print(error_info)
-                                return HttpResponse(
-                                    '【ERROR】：参数 ' + rec3 + ' 没有参数值，请确认系统参数设置是否正确，是否已执行返回 ' + rec3 + ' 的前置接口，以及确认Redis是否已启动')
-                    if('select' in body[rec]):
+                                body[rec] = '【ERROR】：查询结果为空！'
+            # 处理 JSON 数组类型的请求体
+            elif isinstance(body, list):
+                print_log('【DEBUG】检测到 JSON 数组，开始处理...')
+                body_str = str(body)
+                print_log('【DEBUG】原始 body_str: ' + body_str)
+
+                # 处理变量类型 (var)
+                for rec5 in keyword_list5:
+                    if (rec5 in body_str or '{{' + rec5[1:-1] + '}}' in body_str):
+                        print_log('【DEBUG】在 JSON 数组中匹配到 rec5: ' + rec5)
                         try:
-                            sql = body[rec]
-                            cursor = connection.cursor()
-                            cursor.execute(sql)
-                            data = cursor.fetchall()
-                            print(u'查询的结果为： ',data[0][0])
-                            body[rec] = data[0][0]
+                            var_name = public_dict[rec5.replace('{', '').replace('}', '')]
+                            var_value = str(eval(var_name))
+                            print_log('【DEBUG】var_name: ' + var_name + ', var_value: ' + var_value)
+                            body_str = body_str.replace('{{' + rec5[1:-1] + '}}', var_value)
+                            body_str = body_str.replace(rec5, var_value)
+                            print_log('【DEBUG】替换变量后的 body_str: ' + body_str)
                         except Exception:
-                            body[rec] = '【ERROR】：查询结果为空！'
+                            error_info = traceback.format_exc()
+                            print(error_info)
+                            return HttpResponse(
+                                '【ERROR】：参数 ' + rec5 + ' 没有参数值，请确认系统参数设置是否正确')
+
+                # 处理常量类型 (con)
+                for rec1 in keyword_list1:
+                    if rec1 in body_str:
+                        try:
+                            body_str = body_str.replace(rec1,
+                                                        public_dict[rec1.replace('{', '').replace('}', '')])
+                            print_log('【DEBUG】替换常量后的 body_str: ' + body_str)
+                        except Exception:
+                            error_info = traceback.format_exc()
+                            print(error_info)
+
+                # 处理环境设置 (env)
+                for rec4 in keyword_list4:
+                    if rec4 in body_str:
+                        try:
+                            body_str = body_str.replace(rec4,
+                                                        public_dict[rec4.replace('{', '').replace('}', '')])
+                            print_log('【DEBUG】替换环境设置后的 body_str: ' + body_str)
+                        except Exception:
+                            error_info = traceback.format_exc()
+                            print(error_info)
+
+                # 处理关联参数 (res)
+                for rec2 in keyword_list2:
+                    if rec2 in body_str:
+                        try:
+                            body_str = body_str.replace(rec2, cache.get(
+                                rec2.replace('{', '').replace('}', '')).decode('utf-8'))
+                            print_log('【DEBUG】替换关联参数后的 body_str: ' + body_str)
+                        except Exception:
+                            error_info = traceback.format_exc()
+                            print(error_info)
+                            return HttpResponse(
+                                '【ERROR】：参数 ' + rec2 + ' 没有参数值，请确认是否已执行返回 ' + rec2 + ' 的接口')
+
+                # 将字符串解析回 Python 对象
+                try:
+                    body = ast.literal_eval(body_str)
+                    print_log('【DEBUG】解析后的 body: ' + str(body))
+                except Exception as e:
+                    print_log('【ERROR】解析 JSON 数组失败：' + str(e))
+                    return HttpResponse('【ERROR】：JSON 数组格式有误，请检查请求体格式')
             mode = raw_data['interface_mode']
             try:
                 response,cookie = interface_test_start(url,body,head,mode,body_format,True)
@@ -768,11 +867,15 @@ def interface_test_start(url,body,head,mode,body_format,is_out):
 
 def request_post(url,body,head,body_format):
     if(body_format == 'JSON'):
-        body = json.dumps(body)
+        # 检测是否为 JSON 数组
+        if isinstance(body, list):
+            body = json.dumps(body)  # 序列化 JSON 数组
+        else:
+            body = json.dumps(body)  # 序列化 JSON 对象
     else:
         keys = body.keys()
         for rec in keys:
-            if('[{' in str(body[rec]) and '}]' in str(body[rec])):
+            if'[{' in str(body[rec]) and '}]' in str(body[rec]):
                 body = json.dumps(body)
                 break
     r = session.post(url,body,headers = head)
@@ -981,37 +1084,58 @@ def showRequestData(req):
                     print(error_info)
                     return HttpResponse('【ERROR】：参数 '+head[rec]+' 没有参数值，请确认系统参数设置是否正确，是否已执行返回 '+head[rec]+' 的前置接口，以及确认Redis是否已启动')
         body = eval(interfaces.body)
-        for rec in body.keys():
-            if(isinstance(body[rec],str)):
-                for rec1 in keyword_list1:
-                    if(rec1 in body[rec]):
-                        if('captcha' not in rec1):
-                            body[rec] = body[rec].replace(rec1, public_dict[rec1.replace('{','').replace('}','')])
-                        else:
-                            is_login_api = True
-                            yanzheng_url = public_dict[rec1.replace('{','').replace('}','')]
-                            haha = request_get(yanzheng_url,{},{},0)
-                            with open(codefile,'wb') as f:
-                                f.write(haha.content)
-                            yanzheng = getcaptcha()
-                            body[rec] = yanzheng
-                            print_log('【登录验证码】：',','),print_log(yanzheng)
-                for rec2 in keyword_list2:
-                    if(rec2 in body[rec]):
-                        try:
-                            body[rec] = body[rec].replace(rec2, cache.get(rec2.replace('{','').replace('}','')))
-                        except Exception:
-                            error_info = traceback.format_exc()
-                            print(error_info)
-                            return HttpResponse('【ERROR】：参数 '+rec2+' 没有参数值，请确认系统参数设置是否正确，是否已执行返回 '+rec2+' 的前置接口，以及确认Redis是否已启动')
-                if('select' in body[rec]):
-                    sql = body[rec]
-                    cursor = connection.cursor()
-                    print(sql)
-                    cursor.execute(sql)
-                    data = cursor.fetchall()
-                    print(u'查询的结果为： ',data[0][0])
-                    body[rec] = data[0][0]
+        if isinstance(body, dict):
+            for rec in body.keys():
+                if (isinstance(body[rec], str)):
+                    for rec1 in keyword_list1:
+                        if (rec1 in body[rec]):
+                            if ('captcha' not in rec1):
+                                body[rec] = body[rec].replace(rec1, public_dict[rec1.replace('{', '').replace('}', '')])
+                            else:
+                                is_login_api = True
+                                yanzheng_url = public_dict[rec1.replace('{', '').replace('}', '')]
+                                haha = request_get(yanzheng_url, {}, {}, 0)
+                                with open(codefile, 'wb') as f:
+                                    f.write(haha.content)
+                                yanzheng = getcaptcha()
+                                body[rec] = yanzheng
+                                print_log('【登录验证码】：', ','), print_log(yanzheng)
+                    for rec2 in keyword_list2:
+                        if (rec2 in body[rec]):
+                            try:
+                                body[rec] = body[rec].replace(rec2, cache.get(rec2.replace('{', '').replace('}', '')))
+                            except Exception:
+                                error_info = traceback.format_exc()
+                                print(error_info)
+                                return HttpResponse(
+                                    '【ERROR】：参数 ' + rec2 + ' 没有参数值，请确认系统参数设置是否正确，是否已执行返回 ' + rec2 + ' 的前置接口，以及确认 Redis 是否已启动')
+                    if ('select' in body[rec]):
+                        sql = body[rec]
+                        cursor = connection.cursor()
+                        print(sql)
+                        cursor.execute(sql)
+                        data = cursor.fetchall()
+                        print(u'查询的结果为： ', data[0][0])
+                        body[rec] = data[0][0]
+        elif isinstance(body, list):
+            body_str = str(body)
+            for rec2 in keyword_list2:
+                if (rec2 in body_str):
+                    try:
+                        body_str = body_str.replace(rec2,
+                                                    cache.get(rec2.replace('{', '').replace('}', '')).decode('utf-8'))
+                    except Exception:
+                        error_info = traceback.format_exc()
+                        print(error_info)
+                        return HttpResponse('【ERROR】：参数 ' + rec2 + ' 没有参数值')
+            try:
+                body = ast.literal_eval(body_str)
+            except Exception:
+                error_info = traceback.format_exc()
+                print(error_info)
+                return HttpResponse('【ERROR】：JSON 数组格式有误')
+        else:
+            return HttpResponse('【ERROR】：body 参数格式错误，应为字典或列表格式')
         mode = interfaces.mode
         name = interfaces.name
         body_format = interfaces.body_format
