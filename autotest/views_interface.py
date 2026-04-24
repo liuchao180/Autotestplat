@@ -143,11 +143,26 @@ def addModule(request):
     module_name=request.POST.get('module_name')
     parent_module_id = request.POST.get('parent_module_id')
     type = 'api'
+    # if parent_module_id:
+    #     parent_module_id=AutotestplatModule.objects.filter(module_name=parent_module_id).first().id
+    # else:
+    #     parent_module_id = '0'
+    # AutotestplatModule.objects.create(module_name=module_name,parent_module_id=parent_module_id,product_id=product_id,charger=username,type=type)
+    # return HttpResponse('200')
     if parent_module_id:
-        parent_module_id=AutotestplatModule.objects.filter(module_name=parent_module_id).first().id
+        if product_id:
+            parent_module = AutotestplatModule.objects.filter(module_name=parent_module_id,
+                                                              product_id=product_id).first()
+        else:
+            parent_module = AutotestplatModule.objects.filter(module_name=parent_module_id).first()
+        if parent_module:
+            parent_module_id = parent_module.id
+        else:
+            return HttpResponse(f'父模块"{parent_module_id}"不存在，请重试')
     else:
         parent_module_id = '0'
-    AutotestplatModule.objects.create(module_name=module_name,parent_module_id=parent_module_id,product_id=product_id,charger=username,type=type)
+    AutotestplatModule.objects.create(module_name=module_name, parent_module_id=parent_module_id, product_id=product_id,
+                                      charger=username, type=type)
     return HttpResponse('200')
 
 
@@ -522,6 +537,16 @@ def startInterfaceSend(req):
     if req.method == "POST":
         raw_data = req.body
         raw_data = json.loads(raw_data)
+        # === 新增代码：发送请求前，先从 Redis 恢复 Cookie ===
+        cached_cookies = cache.get('auto_cookies_all')
+        if cached_cookies:
+            try:
+                cookie_dict = json.loads(cached_cookies.decode('utf-8'))
+                session.cookies.update(cookie_dict)
+                print_log('【自动加载Cookie】：已从 Redis 恢复 Cookie 到当前会话')
+            except:
+                pass
+        # ===================================================
         interface_name = raw_data['interface_name']
         public_list = AutotestplatParameter.objects.filter()
         keyword_list = ["{"+rec.keywords+"}" for rec in public_list]
@@ -625,6 +650,25 @@ def startInterfaceSend(req):
                     error_info = traceback.format_exc()
                     print(error_info)
                     return HttpResponse('【ERROR】：参数 '+head[rec]+' 没有参数值，请确认系统参数设置是否正确，是否已执行返回 '+head[rec]+' 的前置接口，以及确认Redis是否已启动')
+        # === 新增：自动从 Redis 加载 Cookie 到请求头 ===
+        cached_cookies = cache.get('auto_cookies_all')
+        if cached_cookies:
+            try:
+                cookie_dict = json.loads(cached_cookies.decode('utf-8'))
+                if cookie_dict:
+                    cookie_string = '; '.join([f"{k}={v}" for k, v in cookie_dict.items()])
+                    # 如果请求头中已有Cookie字段，追加；否则新建
+                    if 'Cookie' in head:
+                        if head['Cookie']:
+                            head['Cookie'] = head['Cookie'] + '; ' + cookie_string
+                        else:
+                            head['Cookie'] = cookie_string
+                    else:
+                        head['Cookie'] = cookie_string
+                    print_log(f'【自动注入Cookie】：已将 {len(cookie_dict)} 个Cookie注入请求头')
+            except Exception as e:
+                print_log(f'【WARNING】加载Cookie失败：{str(e)}')
+        # ================================================
         is_login_api = False
         n = 0
         while (n < 5):
@@ -784,6 +828,13 @@ def startInterfaceSend(req):
                 response,cookie = interface_test_start(url,body,head,mode,body_format,True)
             except:
                 return HttpResponse('【ERROR】：' + url + ' 接口录入信息有误，请重新修改')
+            # === 新增代码：无论是否配置正则，每次请求后都自动保存 Cookie ===
+            if session.cookies:
+                for cookie_name, cookie_value in session.cookies.items():
+                    # 统一命名为 Cookie_名称，防止冲突
+                    cache.set(f"Cookie_{cookie_name}", cookie_value)
+                    print_log(f'【自动保存Cookie】：已更新 {cookie_name}')
+            # =========================================================
             if(raw_data['interface_id']!=''):
                 id1=raw_data['interface_id']
                 public_resp = AutotestplatParameter.objects.filter(module_id=int(id1)).exclude(product_id='testplan')
@@ -806,6 +857,15 @@ def startInterfaceSend(req):
                             error_info = traceback.format_exc()
                             print(error_info)
                             print_log('【关联参数】： {' + rec.keywords +'} 在响应数据中未匹配到，请检测前置接口关键字配置，以及Redis是否已启动')
+                        # === 新增通用代码开始 ===
+                        # 动态保存当前请求产生的所有 Cookie 到 Redis
+                        if session.cookies:
+                            for cookie_name, cookie_value in session.cookies.items():
+                                # 存入 Redis 的 key 命名为 "Cookie_name"，避免与用户自定义参数冲突
+                                redis_key = f"Cookie_{cookie_name}"
+                                cache.set(redis_key, cookie_value)
+                                print_log(f'【自动保存Cookie】：已动态更新 {redis_key} = {cookie_value[:20]}...')
+                        # === 新增通用代码结束 ===
             assert_keywords_old = raw_data['interface_assert']
             for rec1 in keyword_list1:
                 if(rec1 in assert_keywords_old):
@@ -858,6 +918,15 @@ def interface_test_start(url,body,head,mode,body_format,is_out):
             response, cookie = Method_HEAD(url, body, head, body_format, is_out)
         elif (mode == 'OPTIONS' or mode == 'options'):
             response, cookie = Method_OPTIONS(url, body, head, body_format, is_out)
+        # === 新增代码：自动把 Session 里的所有 Cookie 保存到 Redis ===
+        import requests.utils
+        # 提取当前 Session 中的所有 Cookie
+        cookie_dict = requests.utils.dict_from_cookiejar(session.cookies)
+        if cookie_dict:
+            # 存入 Redis，key 命名为 'auto_cookies_all'
+            cache.set('auto_cookies_all', json.dumps(cookie_dict))
+            print_log(f'【自动保存Cookie】：已从响应头捕获并保存 {len(cookie_dict)} 个Cookie到Redis')
+        # ===========================================================
         print_log('')
         return response,cookie
     except Exception:

@@ -42,8 +42,7 @@ def addProduct(request):
     product_introduction = request.POST.get('product_introduction')
     charger = request.session.get('user', '')
     delete_flag = 'N'
-    product_name_exist = AutotestplatProduct.objects.filter(product_name=product_name).first()
-    if product_name_exist:
+    if AutotestplatProduct.objects.filter(product_name=product_name,delete_flag='N').first() is not None:
         return HttpResponse(f'产品”{product_name}“已存在，请重新填写')
     AutotestplatProduct.objects.create(product_name=product_name, product_type=product_type, product_introduction=product_introduction,charger=charger,delete_flag=delete_flag)
     return HttpResponse('200')
