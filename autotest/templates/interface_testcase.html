@@ -44,9 +44,14 @@ Auther:：Fin;  Version：Autotestplat-V2.7
              });
 
              function renderTree(data) {
-                 var treeElement = $('.tree');
-                 treeElement.empty();
-                 let clickEvent = false;
+                var treeElement = $('#treeMenu');
+                if (treeElement.length === 0) {
+                    console.error('Tree container #treeMenu not found');
+                    return;
+                }
+                treeElement.empty();
+                let clickEvent = false;
+                
                  function renderNode(node) {
                      for (i = 0; i < node.length; i++) {
                          if (node[i][2] == 0) {
@@ -55,6 +60,7 @@ Auther:：Fin;  Version：Autotestplat-V2.7
                              li.dataset.Id = node[i][0];
                              li.style.fontSize = '13px';
                              li.style.marginTop = '2px';
+                             li.classList.add('tree-node');
                              let addbtn = document.createElement('button');
                              addbtn.className = 'btn btn-default';
                              addbtn.style.width = '17px';
