@@ -236,14 +236,22 @@ function search_performance_interface() {
 
 function select_login(id1,name1,module1) {
     $('#login_panel').append('<a href="javascript:void(0)" id="'+id1+'" name="'+module1+'" class="list-group-item logins" onclick="remove_login_selected(\''+id1+'\')">'+name1+'</a>');
+
 }
+
+function view_test_result() {
+    window.open('/autotest/apiperformance/report/', '_blank');
+}
+
 function select_not_login(id1,name1,module1) {
     $('#not_login_panel').append('<a href="javascript:void(0)" id="'+id1+'" name="'+module1+'" class="list-group-item not_logins" onclick="remove_not_login_selected(\''+id1+'\')">'+name1+'</a>');
 }
+
 function remove_login_selected(ele) {
     var id1 = '#'+ele;
     $('#login_panel').find(id1).remove();
 }
+
 function remove_not_login_selected(ele) {
     var id1 = '#'+ele;
     $('#not_login_panel').find(id1).remove();
