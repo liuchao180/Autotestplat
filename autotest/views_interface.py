@@ -8,12 +8,12 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import render_to_response
 from django.db import connection
 from django.db.models import Q
-from django.db.models import Max
+from django.db.models import Max,Count
 from django.core.cache import cache
 from django.template.context_processors import csrf
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from .models import *
-from datetime import datetime
+from datetime import datetime,timedelta
 from django.db.models import Count
 from django.http import HttpResponse,JsonResponse
 from django.contrib.auth.decorators import login_required
@@ -22,6 +22,7 @@ from hashlib import md5
 import hashlib
 import requests
 import hashlib,string
+
 
 current_dir = os.getcwd()
 logfile = os.path.join(current_dir, 'autotest', 'test_out.log')
@@ -716,9 +717,9 @@ def startInterfaceSend(req):
                                     var_value = str(eval(var_name))
                                     print_log('【DEBUG】var_name: ' + var_name + ', var_value: ' + var_value)
                                     # 如果是字符串类型，自动添加引号
-                                    if isinstance(eval(var_name), str):
-                                        var_value = '"' + var_value + '"'
-                                        print_log('【DEBUG】添加引号后的 var_value: ' + var_value)
+                                    # if isinstance(eval(var_name), str):
+                                    #     var_value = '"' + var_value + '"'
+                                    #     print_log('【DEBUG】添加引号后的 var_value: ' + var_value)
                                     body_str = str(body)
                                     print_log('【DEBUG】原始 body_str: ' + body_str)
                                     # body = str(body).replace(rec5, var_name)

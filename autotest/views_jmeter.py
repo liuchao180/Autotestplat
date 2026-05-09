@@ -123,10 +123,10 @@ def body_thread2(jid,numbf,numxh,numsj):
             '    <hashTree>\n'
     return  ss
 
-def body_cookie(key,value):
+def body_cookie(key,value,domain=''):
     ss =   '          <elementProp name="'+key+'" elementType="Cookie" testname="'+key+'">\n' \
            '            <stringProp name="Cookie.value">'+value+'</stringProp>\n' \
-           '            <stringProp name="Cookie.domain">testone.0easy.com</stringProp>\n' \
+           '            <stringProp name="Cookie.domain">'+domain+'</stringProp>\n' \
            '            <stringProp name="Cookie.path"></stringProp>\n' \
            '            <boolProp name="Cookie.secure">false</boolProp>\n' \
            '            <longProp name="Cookie.expires">0</longProp>\n' \

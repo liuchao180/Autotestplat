@@ -14,7 +14,7 @@ from django.template.context_processors import csrf
 from urllib.parse import urlparse
 from django.core.cache import cache
 from django.conf import settings
-from datetime import datetime
+from datetime import datetime,timedelta
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from .models import *
@@ -167,6 +167,7 @@ def searchPerformanceInterface(request):
                          'charger_list': charger_list,}
         return HttpResponse(json.dumps(interface_list2), content_type='application/json')
 
+
 def generateJmeterFile(request):
     try:
         raw_data = request.body
@@ -176,9 +177,66 @@ def generateJmeterFile(request):
         num_bf = raw_data['num_bf']
         num_xh = raw_data['num_xh']
         num_sj = raw_data['num_sj']
-        num_sj = str(int(num_sj)*60)
+        num_sj = str(int(num_sj) * 60)
         mode = raw_data['mode']
         deal_cookie = raw_data['deal_cookie']
+
+        print(f'【INFO】开始生成JMeter文件')
+        print(f'【INFO】登录接口列表: {id_list_login}')
+        print(f'【INFO】业务接口列表: {id_list_not_login}')
+
+        login_cookie_dict = {}
+
+        print(f'【INFO】开始从Redis获取Cookie用于性能测试')
+        try:
+            import redis as redis_client
+            r = redis_client.Redis(host='127.0.0.1', port=6379, db=0, decode_responses=True)
+            cached_cookies = r.get('auto_cookies_all')
+            print(f'【DEBUG】Redis中auto_cookies_all的原始值为: {cached_cookies}')
+            print(f'【DEBUG】Redis中auto_cookies_all的类型为: {type(cached_cookies)}')
+
+            if cached_cookies:
+                try:
+                    cookie_dict = None
+
+                    if isinstance(cached_cookies, str):
+                        cookie_dict = json.loads(cached_cookies)
+                    elif isinstance(cached_cookies, dict):
+                        cookie_dict = cached_cookies
+
+                    print(f'【DEBUG】解析后的cookie_dict: {cookie_dict}')
+
+                    if cookie_dict and isinstance(cookie_dict, dict) and len(cookie_dict) > 0:
+                        for key, value in cookie_dict.items():
+                            login_cookie_dict[key] = value
+                            print(f'【SUCCESS】从Redis获取到Cookie: {key}={value}')
+                    else:
+                        print(f'【WARNING】cookie_dict为空或不是字典类型')
+                except Exception as e:
+                    print(f'【ERROR】解析Redis Cookie失败: {e}')
+
+                    traceback.print_exc()
+
+                    try:
+                        cookie_dict = ast.literal_eval(str(cached_cookies))
+                        if isinstance(cookie_dict, dict):
+                            for key, value in cookie_dict.items():
+                                login_cookie_dict[key] = value
+                                print(f'【SUCCESS】通过ast解析从Redis获取到Cookie: {key}={value}')
+                    except Exception as ae:
+                        print(f'【ERROR】ast解析也失败: {ae}')
+            else:
+                print(f'【WARNING】Redis中auto_cookies_all为空，请先在接口用例中执行登录接口')
+        except Exception as e:
+            print(f'【ERROR】从Redis获取Cookie失败: {e}')
+
+            traceback.print_exc()
+
+        if login_cookie_dict:
+            print(f'【SUCCESS】成功获取到 {len(login_cookie_dict)} 个Cookie: {login_cookie_dict}')
+        else:
+            print(f'【WARNING】未能从Redis获取到Cookie，后续接口将不带Cookie')
+
         public_list = AutotestplatParameter.objects.filter()
         keyword_list = ["{" + rec.keywords + "}" for rec in public_list]
         public_list1 = AutotestplatParameter.objects.filter(Q(type='con'))
@@ -213,17 +271,15 @@ def generateJmeterFile(request):
         public_dict.update(public_dict4)
         public_dict.update(public_dict5)
         body_list = []
-        id=''
-        name=''
-        login_cookie_dict = {}
+        id = ''
+        name = ''
+        host = ''
         for id in id_list_login:
             interface_list = AutotestplatInterfaceTestcase.objects.filter(id=str(id))
             for rec in interface_list:
                 id = rec.id
                 url = rec.url
-                url2= url.replace('?','//%')
-                # 修复 1：正确解析 body，支持 JSON 格式
-                # 1. 解析 Body 为字典
+                url2 = url.replace('?', '//%')
                 try:
                     parabody_dict = eval(rec.body)
                     if not isinstance(parabody_dict, dict):
@@ -239,10 +295,10 @@ def generateJmeterFile(request):
                     if ("{" in url_host and "}" in url_host):
                         end_index = url_host.find("}")
                         key_url_host = url_host[:end_index + 1]
-                        url_host = url_host.replace(key_url_host, public_dict[key_url_host.replace('{', '').replace('}', '').replace(' ', '')])
+                        url_host = url_host.replace(key_url_host, public_dict[
+                            key_url_host.replace('{', '').replace('}', '').replace(' ', '')])
                 except:
                     return HttpResponse('【ERROR】：url_host参数 ' + url_host + ' 有误，请重新修改 ')
-
 
                 if url_host.lower().startswith('https://'):
                     scheme = 'https'
@@ -251,7 +307,7 @@ def generateJmeterFile(request):
                     scheme = 'http'
                     clean_host = url_host[7:]
                 else:
-                    scheme = 'https'  # 默认 https
+                    scheme = 'https'
                     clean_host = url_host
 
                 if ':' in clean_host:
@@ -261,13 +317,13 @@ def generateJmeterFile(request):
                     host = clean_host
                     port = '443' if scheme == 'https' else '80'
                 path = '{uri.path}'.format(uri=parsed_uri)
-                path2 = path.replace('//%','?')
+                path2 = path.replace('//%', '?')
 
                 head1 = eval(head)
                 content_type = head1.get('Content-Type', '')
-                
+
                 has_content_type = any(k.lower() == 'content-type' for k in head1.keys())
-                
+
                 if 'application/json' in content_type.lower():
                     parabody_str = json.dumps(parabody_dict, ensure_ascii=False)
                     head_list1 = [body_head(k, v) for k, v in head1.items()]
@@ -280,53 +336,53 @@ def generateJmeterFile(request):
                     body1 = body_request_form(str(id), name, host, port, path2, scheme, parabody_dict,
                                               ''.join(head_list1), assertkey)
                 body_list.append(body1)
-                islogin = True
-                login_response = start_interface_login(id)
-                try:
-                    from django.http import HttpResponse as DjangoHttpResponse
-                    if hasattr(login_response, 'content'):
-                        login_content = login_response.content.decode('utf-8') if isinstance(login_response.content,
-                                                                                             bytes) else str(
-                            login_response.content)
-                    else:
-                        login_content = str(login_response)
-
-                    import ast
-                    login_data = ast.literal_eval(login_content)
-                    if isinstance(login_data, list) and len(login_data) > 0:
-                        for log_line in login_data:
-                            if '【Cookies】：' in log_line:
-                                cookie_part = log_line.split('【Cookies】：')[1].strip()
-                                if cookie_part and cookie_part != ',':
-                                    cookie_pairs = cookie_part.split(';')
-                                    for pair in cookie_pairs:
-                                        pair = pair.strip()
-                                        if '=' in pair:
-                                            key, value = pair.split('=', 1)
-                                            login_cookie_dict[key.strip()] = value.strip()
-                                            print(f'【INFO】提取到Cookie: {key.strip()}={value.strip()}')
-                except Exception as e:
-                    print(f'【WARNING】解析登录接口Cookie失败: {e}')
-                    import traceback
-                    traceback.print_exc()
                 update_cookie = rec.update_cookie
                 update_cookie = update_cookie.replace('{', '').replace('}', '')
+        if not host and id_list_not_login:
+            first_interface = AutotestplatInterfaceTestcase.objects.filter(id=str(id_list_not_login[0])).first()
+            if first_interface:
+                url_host = first_interface.url_host
+                try:
+                    if ("{" in url_host and "}" in url_host):
+                        end_index = url_host.find("}")
+                        key_url_host = url_host[:end_index + 1]
+                        url_host = url_host.replace(key_url_host, public_dict[
+                            key_url_host.replace('{', '').replace('}', '').replace(' ', '')])
+                except:
+                    pass
+
+                if url_host.startswith('http://') or url_host.startswith('https://'):
+                    url_host = url_host.split('://')[1]
+
+                if ':' in url_host:
+                    host = url_host.split(':')[0]
+                else:
+                    host = url_host
+                print(f'【INFO】从业务接口获取到域名: {host}')
+
         body1 = ''.join(body_list)
-        body_thread1=''
+        body_thread1 = ''
         try:
-            body_thread1 = body_thread(id,'1','1')
+            body_thread1 = body_thread(id, '1', '1')
         except Exception:
             pass
         cookie_xml = ''
+        cookie_header_value = ''
         if login_cookie_dict:
             cookie_parts = []
+            cookie_header_parts = []
+            cookie_domain = host if host else ''
             for key, value in login_cookie_dict.items():
-                cookie_parts.append(body_cookie(key, value))
-                print(f'【INFO】生成Cookie XML: {key}={value}')
+                cookie_parts.append(body_cookie(key, value, cookie_domain))
+                cookie_header_parts.append(f'{key}={value}')
+                print(f'【INFO】生成Cookie XML: {key}={value}, domain={cookie_domain}')
             cookie_xml = ''.join(cookie_parts)
+            cookie_header_value = '; '.join(cookie_header_parts)
             print(f'【INFO】拼接后的Cookie XML长度: {len(cookie_xml)}')
+            print(f'【INFO】拼接后的Cookie Header值: {cookie_header_value}')
+            print(f'【INFO】最终Cookie字典: {login_cookie_dict}')
         else:
-            print(f'【WARNING】login_cookie_dict为空，无法生成Cookie XML')
+            print(f'【ERROR】login_cookie_dict为空，无法生成Cookie XML，性能测试将会失败！')
 
         body_list2 = []
         for id2 in id_list_not_login:
@@ -338,7 +394,8 @@ def generateJmeterFile(request):
                     if ("{" in url_host and "}" in url_host):
                         end_index = url_host.find("}")
                         key_url_host = url_host[:end_index + 1]
-                        url_host = url_host.replace(key_url_host, public_dict[key_url_host.replace('{', '').replace('}', '').replace(' ', '')])
+                        url_host = url_host.replace(key_url_host, public_dict[
+                            key_url_host.replace('{', '').replace('}', '').replace(' ', '')])
                 except:
                     return HttpResponse('【ERROR】：url_host参数 ' + url_host + ' 有误，请重新修改 ')
                 url = rec.url
@@ -349,7 +406,8 @@ def generateJmeterFile(request):
                     url = url.replace(key_url, public_dict[key_url.replace('{', '').replace('}', '')])
                 body = eval(rec.body)
                 for bodykey in body.keys():
-                    if(isinstance(body[bodykey],str) or isinstance(body[bodykey],list) or isinstance(body[bodykey],dict)):
+                    if (isinstance(body[bodykey], str) or isinstance(body[bodykey], list) or isinstance(body[bodykey],
+                                                                                                        dict)):
                         for rec1 in keyword_list1:
                             if (rec1 in body[bodykey]):
                                 if ('captcha' not in rec1):
@@ -387,7 +445,8 @@ def generateJmeterFile(request):
                                 except Exception:
                                     error_info = traceback.format_exc()
                                     print(error_info)
-                                    return HttpResponse('【ERROR】：参数 ' + rec2 + ' 没有参数值，请确认是否已执行返回 ' + rec2 + ' 的接口')
+                                    return HttpResponse(
+                                        '【ERROR】：参数 ' + rec2 + ' 没有参数值，请确认是否已执行返回 ' + rec2 + ' 的接口')
                         for rec3 in keyword_list3:
                             if (rec3 in body[bodykey]):
                                 try:
@@ -417,7 +476,7 @@ def generateJmeterFile(request):
                 domain = url_host
                 path = '{uri.path}'.format(uri=parsed_uri)
                 path2 = path.replace('//%', '?')
-                
+
                 if not scheme:
                     if url_host.lower().startswith('https://'):
                         scheme = 'https'
@@ -425,7 +484,7 @@ def generateJmeterFile(request):
                         scheme = 'http'
                     else:
                         scheme = 'https'
-                
+
                 if url_host.startswith('http://') or url_host.startswith('https://'):
                     host = domain.split(':')[1].replace('//', '')
                     if len(domain.split(':')) > 2:
@@ -438,16 +497,17 @@ def generateJmeterFile(request):
                         port = domain.split(':')[1]
                     else:
                         port = ''
-                
+
                 if not port:
                     port = '443' if scheme == 'https' else '80'
-                    
+
                 head2 = eval(head)
                 content_type = head2.get('Content-Type', '')
                 head_list2 = []
-                
+
                 has_content_type = any(k.lower() == 'content-type' for k in head2.keys())
                 has_cookie_header = any(k.lower() == 'cookie' for k in head2.keys())
+
                 for item, value in head2.items():
                     item2 = item
                     value2 = value
@@ -460,43 +520,46 @@ def generateJmeterFile(request):
                     else:
                         head2 = body_head(item2, value2)
                     head_list2.append(head2)
-                
+
                 if not has_content_type:
                     head_list2.append(body_head('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8'))
 
-                if cookie_xml and not has_cookie_header:
-                    head_list2.append(body_head('Cookie', cookie_xml))
-                    print(f'【INFO】为接口 {id2} 添加独立的Cookie Header: {cookie_xml}')
+                if cookie_header_value and not has_cookie_header:
+                    head_list2.append(body_head('Cookie', cookie_header_value))
+                    print(f'【INFO】为接口 {id2} 添加Cookie Header: {cookie_header_value}')
 
                 head2_str = ''.join(head_list2)
-                
+
                 if 'application/json' in content_type.lower():
-                    body2 = body_request2(str(id2), name, host, port, path2, scheme, parabody, cookie_xml, head2_str, assertkey)
+                    body2 = body_request2(str(id2), name, host, port, path2, scheme, parabody, cookie_xml, head2_str,
+                                          assertkey)
                 else:
-                    body2 = body_request_form(str(id2), name, host, port, path2, scheme, body, head2_str, assertkey,cookie_xml)
+                    body2 = body_request_form(str(id2), name, host, port, path2, scheme, body, head2_str, assertkey,
+                                              cookie_xml)
 
                 body_list2.append(body2)
                 islogin = False
         body2 = ''.join(body_list2)
-        body_thread22=''
+        body_thread22 = ''
         if num_xh == '0':
             num_xh = '-1'
         else:
             num_xh = num_xh
         try:
-            body_thread22 = body_thread2(id2,num_bf,num_xh,num_sj)
+            body_thread22 = body_thread2(id2, num_bf, num_xh, num_sj)
         except Exception:
             pass
         body3 = body_thread1 + str(body1) + '</hashTree>\n' + body_thread22 + str(body2)
         body4 = body_thread22 + str(body1) + str(body2)
-        if mode=='多用户':
-            generate_jmx(name,host, port, path2, scheme, body4,)
+        if mode == '多用户':
+            generate_jmx(name, host, port, path2, scheme, body4, )
         else:
-            generate_jmx2(name,host, port, path2, scheme, body3,)
+            generate_jmx2(name, host, port, path2, scheme, body3, )
         return HttpResponse("success")
     except Exception:
         traceback.print_exc()
         return HttpResponse("failed")
+
 
 def prepareJmeter(request):
     try:
