@@ -374,7 +374,7 @@ def testcase_template_selenium(user_product_id,web_testcase_code):
         caseResultInit(user_product_id, '未执行')
     else:
         sql = "SELECT id,web_testcase_findmethod,web_testcase_evelement,web_testcase_optmethod,web_testcase_testdata,web_testcase_assertdata,`web_testcase_stepresult`,web_testcase_code from autotestplat_web_testcase where autotestplat_web_testcase.web_testcase_code=" + str(web_testcase_code) + " ORDER BY id ASC "
-    coon = pymysql.connect(user='root', passwd='test123456', db='autotestplat', port=3306, host='127.0.0.1',charset='utf8')
+    coon = pymysql.connect(user='root', passwd='Liuzhichao@123', db='autotestplat', port=3306, host='127.0.0.1',charset='utf8')
     cursor = coon.cursor()
     aa = cursor.execute(sql)
     info = cursor.fetchmany(aa)
@@ -481,7 +481,7 @@ def testcase_template_cypress(user_product_id,web_testcase_code):
     else:
         sql = "SELECT id,web_testcase_findmethod,web_testcase_evelement,web_testcase_optmethod,web_testcase_testdata,web_testcase_assertdata,`web_testcase_stepresult`,web_testcase_code from autotestplat_web_testcase where autotestplat_web_testcase.web_testcase_code=" + str(
             web_testcase_code) + " ORDER BY id ASC "
-    coon = pymysql.connect(user='root', passwd='test123456', db='autotestplat', port=3306, host='127.0.0.1',
+    coon = pymysql.connect(user='root', passwd='Liuzhichao@123', db='autotestplat', port=3306, host='127.0.0.1',
                            charset='utf8')
     cursor = coon.cursor()
     aa = cursor.execute(sql)
@@ -590,7 +590,7 @@ def testcase_template_playwright(user_product_id,web_testcase_code):
     else:
         sql = "SELECT id,web_testcase_findmethod,web_testcase_evelement,web_testcase_optmethod,web_testcase_testdata,web_testcase_assertdata,`web_testcase_stepresult`,web_testcase_code from autotestplat_web_testcase where autotestplat_web_testcase.web_testcase_code=" + str(
             web_testcase_code) + " ORDER BY id ASC "
-    coon = pymysql.connect(user='root', passwd='test123456', db='autotestplat', port=3306, host='127.0.0.1',
+    coon = pymysql.connect(user='root', passwd='Liuzhichao@123', db='autotestplat', port=3306, host='127.0.0.1',
                            charset='utf8')
     cursor = coon.cursor()
     aa = cursor.execute(sql)
@@ -690,7 +690,7 @@ def casestepResult(web_testcase_code, result):
     now = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
     sql = "UPDATE autotestplat_web_testcase set autotestplat_web_testcase.web_testcase_stepresult=%s,autotestplat_web_testcase.run_time=%s where autotestplat_web_testcase.id=%s;"
     param = (result, now, web_testcase_code)
-    coon = pymysql.connect(user='root', passwd='test123456', db='autotestplat', port=3306, host='127.0.0.1',charset='utf8')
+    coon = pymysql.connect(user='root', passwd='Liuzhichao@123', db='autotestplat', port=3306, host='127.0.0.1',charset='utf8')
     cursor = coon.cursor()
     cursor.execute(sql, param)
     coon.commit()
@@ -703,7 +703,7 @@ def caseResult(web_testcase_code, result):
     sql = "UPDATE autotestplat_web_testcase set autotestplat_web_testcase.web_testcase_result=%s,autotestplat_web_testcase.run_time=%s where autotestplat_web_testcase.web_testcase_code=%s;"
     param = (result, now, web_testcase_code)
     print('web autotest result is ' + result.decode())
-    coon = pymysql.connect(user='root', passwd='test123456', db='autotestplat', port=3306, host='127.0.0.1',charset='utf8')
+    coon = pymysql.connect(user='root', passwd='Liuzhichao@123', db='autotestplat', port=3306, host='127.0.0.1',charset='utf8')
     cursor = coon.cursor()
     cursor.execute(sql, param)
     coon.commit()
@@ -716,7 +716,7 @@ def caseResultInit(user_product_id,result):
     sql = "UPDATE autotestplat_web_testcase set autotestplat_web_testcase.web_testcase_result=%s,autotestplat_web_testcase.web_testcase_stepresult=%s,autotestplat_web_testcase.run_time=%s where autotestplat_web_testcase.product_id=%s"
     param = (result, result, now, user_product_id)
     print('web autotest result init is ' + result.decode())
-    coon = pymysql.connect(user='root', passwd='test123456', db='autotestplat', port=3306, host='127.0.0.1',charset='utf8')
+    coon = pymysql.connect(user='root', passwd='Liuzhichao@123', db='autotestplat', port=3306, host='127.0.0.1',charset='utf8')
     cursor = coon.cursor()
     cursor.execute(sql, param)
     coon.commit()

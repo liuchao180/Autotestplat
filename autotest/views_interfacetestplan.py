@@ -12,7 +12,7 @@ from django.core.cache import cache
 from django.template.context_processors import csrf
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from .models import *
-from datetime import datetime
+from datetime import datetime,timedelta
 from django.http import HttpResponse
 from .views_interface import cache,print_log,interface_test_start, assert_test_old
 from django.contrib.auth.decorators import login_required
@@ -265,70 +265,7 @@ def delTestplan(request):
         AutotestplatTestplanInterfaceOrder.objects.filter(suit_id=id1).delete()
         return HttpResponse('delete success!')
 
-# def searchTestplan(req):
-#     username = req.session.get('user', '')
-#     key_words_product_id = req.GET.get('key_words_product_id', '')
-#     key_words_suit = req.GET.get('key_words_suit', '')
-#     key_words_name = req.GET.get('key_words_name', '')
-#     key_words_charger = req.GET.get('key_words_charger', '')
-#     interfaces_all = AutotestplatInterfaceTestcase.objects.all().order_by('-product_id','order')
-#     if key_words_product_id =='':
-#         if AuthUser.objects.filter(username=username).first().is_superuser == 1:
-#             product_id = ""
-#         else:
-#             product_id = AuthUser.objects.filter(username=username).first().last_name
-#     else:
-#         product_id = AutotestplatProduct.objects.filter(product_name=key_words_product_id).first().id
-#     suits = AutotestplatTestplan.objects.filter(Q(suit_name__icontains=key_words_suit),Q(product_id__icontains=product_id),Q(interface_name__icontains=key_words_name),Q(charger__icontains=key_words_charger)).order_by('id')
-#     new_suits = []
-#     for id in suits:
-#         new_id = id
-#         task = PeriodicTask.objects.filter(id=id.task_id).first()
-#         if task is not None:
-#             crontab_id = task.crontab_id
-#         else:
-#             crontab_id = None
-#         if task is not None:
-#             interval_id = task.interval_id
-#         else:
-#             interval_id = None
-#         if crontab_id != None and crontab_id != '':
-#             runtime_year = datetime.now().year
-#             runtime_month = CrontabSchedule.objects.filter(id=crontab_id).values_list()[0][5]
-#             runtime_day = CrontabSchedule.objects.filter(id=crontab_id).values_list()[0][4]
-#             runtime_hour = CrontabSchedule.objects.filter(id=crontab_id).values_list()[0][2]
-#             runtime_min = CrontabSchedule.objects.filter(id=crontab_id).values_list()[0][1]
-#             runtime = str(
-#                 runtime_year) + '-' + runtime_month + '-' + runtime_day + ' ' + runtime_hour + ':' + runtime_min
-#             new_id.task_id = runtime
-#         elif interval_id != None and interval_id != '':
-#             runtime_every = IntervalSchedule.objects.filter(id=interval_id).values_list()[0][1]
-#             runtime_peroid = IntervalSchedule.objects.filter(id=interval_id).values_list()[0][2]
-#             if runtime_peroid == 'minutes':
-#                 runtime = '每分钟' + str(runtime_every) + '次'
-#             elif runtime_peroid == 'hours':
-#                 runtime = '每小时' + str(runtime_every) + '次'
-#             elif runtime_peroid == 'days':
-#                 runtime = '每天' + str(runtime_every) + '次'
-#             new_id.task_id = runtime
-#         else:
-#             new_id.task_id = ""
-#         product = AutotestplatProduct.objects.filter(id=id.product_id).first()
-#         if product:
-#             new_id.product_id = product.product_name
-#         new_suits.append(new_id)
-#     paginator = Paginator(new_suits, 11)
-#     num = len(suits)
-#     page = req.GET.get('page', 1)
-#     try:
-#         page_list = paginator.page(page)
-#     except PageNotAnInteger:
-#         page_list = paginator.page(1)
-#     except EmptyPage:
-#         page_list = paginator.page(paginator.num_pages)
-#     c = csrf(req)
-#     c.update({'page_list': page_list, 'num': num, 'interfaces_all':interfaces_all})
-#     return render_to_response("interface_testplan.html",c)
+
 def searchTestplan(req):
     username = req.session.get('user', '')
     key_words_product_id = req.GET.get('key_words_product_id', '')
@@ -1188,6 +1125,22 @@ def startInterfaceTestplan(request):
                             return HttpResponse(
                                 '【ERROR】：参数 ' + head[rec] + ' 没有参数值，请确认系统参数设置是否正确，是否已执行返回 ' +
                                 head[rec] + ' 的前置接口，以及确认Redis是否已启动')
+                
+                # === 新增：自动从 Redis 加载 Cookie 到请求头 ===
+                cached_cookies = cache.get('auto_cookies_all')
+                if cached_cookies:
+                    try:
+                        cookie_dict = json.loads(cached_cookies.decode('utf-8'))
+                        if cookie_dict:
+                            cookie_string = '; '.join([f"{k}={v}" for k, v in cookie_dict.items()])
+                            # 直接设置请求头的 Cookie 字段，不操作 session.cookies
+                            head['Cookie'] = cookie_string
+                            print_log(f'【自动注入Cookie】：已将 {len(cookie_dict)} 个Cookie注入请求头')
+                            print_log(f'【DEBUG】Cookie值：{cookie_string}')
+                    except Exception as e:
+                        print_log(f'【WARNING】加载Cookie失败：{str(e)}')
+                # ================================================
+                
                 is_login_api = False
                 n = 0
                 while (n < 5):
@@ -1287,6 +1240,15 @@ def startInterfaceTestplan(request):
                     response, cookie = interface_test_start(url, body, head, mode, body_format, True)
                     endtime = datetime.now()
                     response_time = (endtime - starttime).total_seconds()
+                    try:
+                        import requests.utils
+                        cookie_dict = requests.utils.dict_from_cookiejar(session.cookies)
+                        if cookie_dict:
+                            cache.set('auto_cookies_all', json.dumps(cookie_dict))
+                            cache.expire('auto_cookies_all', 3600)
+                            print_log(f'【自动保存Cookie】：已保存 {len(cookie_dict)} 个Cookie到Redis')
+                    except Exception as e:
+                        print_log(f'【WARNING】保存Cookie失败：{str(e)}')
                     update_cookie = cur_interface.update_cookie
                     public_resp = AutotestplatParameter.objects.filter(module_id=int(cur_id))
                     if (str(public_resp) != '[]'):
@@ -1752,6 +1714,22 @@ def interfaceTestTask(case_list,test_time,response_time,report_id):
                         error_info = traceback.format_exc()
                         print(error_info)
                         return HttpResponse('【ERROR】：参数 '+head[rec]+' 没有参数值，请确认系统参数设置是否正确，是否已执行返回 '+head[rec]+' 的前置接口，以及确认Redis是否已启动')
+            
+            # === 新增：自动从 Redis 加载 Cookie 到请求头 ===
+            cached_cookies = cache.get('auto_cookies_all')
+            if cached_cookies:
+                try:
+                    cookie_dict = json.loads(cached_cookies.decode('utf-8'))
+                    if cookie_dict:
+                        cookie_string = '; '.join([f"{k}={v}" for k, v in cookie_dict.items()])
+                        # 直接设置请求头的 Cookie 字段，不操作 session.cookies
+                        head['Cookie'] = cookie_string
+                        print_log(f'【自动注入Cookie】：已将 {len(cookie_dict)} 个Cookie注入请求头')
+                        print_log(f'【DEBUG】Cookie值：{cookie_string}')
+                except Exception as e:
+                    print_log(f'【WARNING】加载Cookie失败：{str(e)}')
+            # ================================================
+            
             body = eval(cur_interface.body)
             print(f'【DEBUG】body 类型：{type(body)}, 内容：{str(body)[:200]}')
 
@@ -1851,6 +1829,14 @@ def interfaceTestTask(case_list,test_time,response_time,report_id):
             response,cookie = interface_test_start(url,body,head,mode,body_format,False)
             endtime = datetime.now()
             response_time = (endtime - starttime).total_seconds()
+            
+            # === 新增代码：无论是否配置正则，每次请求后都自动保存 Cookie ===
+            if session.cookies:
+                for cookie_name, cookie_value in session.cookies.items():
+                    cache.set(f"Cookie_{cookie_name}", cookie_value)
+                    print_log(f'【自动保存Cookie】：已更新 {cookie_name}')
+            # =========================================================
+            
             print(
                 f'【接口响应】URL={url[:100]}..., 响应时间={response_time}秒，状态码={response[:100] if response else "None"}...')
             update_cookie = cur_interface.update_cookie

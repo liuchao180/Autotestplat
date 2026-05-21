@@ -88,6 +88,7 @@ urlpatterns = [
     path('apiperformance/prepare/', views_performance.prepareJmeter),
     path('apiperformance/start/', views_performance.startTestJmeter),
     path('apiperformance/progress/', views_performance.showProgress),
+    path('apiperformance/status/', views_performance.getJmeterStatus),
     path('apptestcase/', views_apptestcase.getAppView, name='apptestcase'),
     path('apptestcase/getSearchSelect/', views_apptestcase.loadAppOptions),
     path('apptestcase/getTableData/', views_apptestcase.loadAppTestcaseTable),

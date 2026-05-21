@@ -948,42 +948,136 @@ def request_post(url,body,head,body_format):
             if'[{' in str(body[rec]) and '}]' in str(body[rec]):
                 body = json.dumps(body)
                 break
+    
+    # === 新增：请求前，直接从 Redis 同步最新 Cookie 到 session ===
+    try:
+        cached_cookies = cache.get('auto_cookies_all')
+        if cached_cookies:
+            # 先清空 session 中的旧 Cookie
+            session.cookies.clear()
+            # 从 Redis 获取最新 Cookie
+            cookie_dict = json.loads(cached_cookies.decode('utf-8'))
+            if cookie_dict:
+                session.cookies.update(cookie_dict)
+                print_log(f'【请求前同步Cookie】：已从 Redis 同步 {len(cookie_dict)} 个Cookie到 session')
+    except Exception as e:
+        print_log(f'【WARNING】请求前同步Cookie失败：{str(e)}')
+    # ====================================================================
+    
     r = session.post(url,body,headers = head)
     return r
 
 def request_get(url,body,head,body_format):
     if(body_format == 'JSON'):
         body = json.dumps(body)
+    
+    # === 新增：请求前，直接从 Redis 同步最新 Cookie 到 session ===
+    try:
+        cached_cookies = cache.get('auto_cookies_all')
+        if cached_cookies:
+            session.cookies.clear()
+            cookie_dict = json.loads(cached_cookies.decode('utf-8'))
+            if cookie_dict:
+                session.cookies.update(cookie_dict)
+    except Exception as e:
+        print_log(f'【WARNING】请求前同步Cookie失败：{str(e)}')
+    # ====================================================================
+    
     r = session.get(url,params = body, headers=head)
     return r
 
 def request_put(url,body,head,body_format):
     if(body_format == 'JSON'):
         body = json.dumps(body)
+    
+    # === 新增：请求前，直接从 Redis 同步最新 Cookie 到 session ===
+    try:
+        cached_cookies = cache.get('auto_cookies_all')
+        if cached_cookies:
+            session.cookies.clear()
+            cookie_dict = json.loads(cached_cookies.decode('utf-8'))
+            if cookie_dict:
+                session.cookies.update(cookie_dict)
+    except Exception as e:
+        print_log(f'【WARNING】请求前同步Cookie失败：{str(e)}')
+    # ====================================================================
+    
     r = session.put(url,params = body, headers=head)
     return r
 
 def request_delete(url,body,head,body_format):
     if(body_format == 'JSON'):
         body = json.dumps(body)
+    
+    # === 新增：请求前，直接从 Redis 同步最新 Cookie 到 session ===
+    try:
+        cached_cookies = cache.get('auto_cookies_all')
+        if cached_cookies:
+            session.cookies.clear()
+            cookie_dict = json.loads(cached_cookies.decode('utf-8'))
+            if cookie_dict:
+                session.cookies.update(cookie_dict)
+    except Exception as e:
+        print_log(f'【WARNING】请求前同步Cookie失败：{str(e)}')
+    # ====================================================================
+    
     r = session.delete(url,json = body, headers=head)
     return r
 
 def request_patch(url,body,head,body_format):
     if(body_format == 'JSON'):
         body = json.dumps(body)
+    
+    # === 新增：请求前，直接从 Redis 同步最新 Cookie 到 session ===
+    try:
+        cached_cookies = cache.get('auto_cookies_all')
+        if cached_cookies:
+            session.cookies.clear()
+            cookie_dict = json.loads(cached_cookies.decode('utf-8'))
+            if cookie_dict:
+                session.cookies.update(cookie_dict)
+    except Exception as e:
+        print_log(f'【WARNING】请求前同步Cookie失败：{str(e)}')
+    # ====================================================================
+    
     r = session.patch(url,json = body, headers=head)
     return r
 
 def request_head(url,body,head,body_format):
     if(body_format == 'JSON'):
         body = json.dumps(body)
+    
+    # === 新增：请求前，直接从 Redis 同步最新 Cookie 到 session ===
+    try:
+        cached_cookies = cache.get('auto_cookies_all')
+        if cached_cookies:
+            session.cookies.clear()
+            cookie_dict = json.loads(cached_cookies.decode('utf-8'))
+            if cookie_dict:
+                session.cookies.update(cookie_dict)
+    except Exception as e:
+        print_log(f'【WARNING】请求前同步Cookie失败：{str(e)}')
+    # ====================================================================
+    
     r = session.head(url,json = body, headers=head)
     return r
 
 def request_options(url,body,head,body_format):
     if(body_format == 'JSON'):
         body = json.dumps(body)
+    
+    # === 新增：请求前，直接从 Redis 同步最新 Cookie 到 session ===
+    try:
+        cached_cookies = cache.get('auto_cookies_all')
+        if cached_cookies:
+            session.cookies.clear()
+            cookie_dict = json.loads(cached_cookies.decode('utf-8'))
+            if cookie_dict:
+                session.cookies.update(cookie_dict)
+    except Exception as e:
+        print_log(f'【WARNING】请求前同步Cookie失败：{str(e)}')
+    # ====================================================================
+    
     r = session.options(url,json = body, headers=head)
     return r
 

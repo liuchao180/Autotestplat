@@ -73,11 +73,24 @@ def report(request):
     output_index_path = os.path.join(current_dir, 'autotest', 'static', 'output', 'index.html')
     
     if os.path.exists(output_index_path):
-        with open(output_index_path, 'r', encoding='utf-8') as f:
-            content = f.read()
+        # 尝试多种编码方式读取，解决中文乱码问题
+        content = None
+        # JMeter 在 Windows 上通常使用 GBK 编码，先尝试 UTF-8，失败后尝试 GBK
+        for encoding in ['utf-8', 'gbk', 'gb2312', 'gb18030']:
+            try:
+                with open(output_index_path, 'r', encoding=encoding) as f:
+                    content = f.read()
+                print(f"【SUCCESS】使用 {encoding} 编码成功读取 JMeter 报告")
+                break
+            except UnicodeDecodeError:
+                continue
+        
+        if content is None:
+            return HttpResponse('<h1>测试报告编码错误</h1><p>无法正确读取报告文件</p>')
+        
         content = translate_jmeter_report(content)
-        # 必须指定 content_type 为 text/html，否则浏览器会当成文本显示
-        return HttpResponse(content, content_type='text/html')
+        # 必须指定 content_type 为 text/html; charset=utf-8，确保浏览器使用 UTF-8 解码
+        return HttpResponse(content, content_type='text/html; charset=utf-8')
     else:
         return HttpResponse('<h1>测试报告不存在</h1><p>请先执行性能测试</p>')
 
@@ -645,22 +658,30 @@ def startTestJmeter(request):
             '-Jlanguage=zh_CN'
         ]
 
-        # 注意：这里使用 shell=False，因为我们传递的是列表参数，不需要 shell 解析
-        result = subprocess.run(
+        # 【关键修改】：使用 subprocess.Popen 异步启动 JMeter，不阻塞请求
+        # 这样可以立即返回响应，前端可以继续轮询真实状态
+        pid_file = os.path.join(current_dir, 'autotest', 'jmeter.pid')
+        
+        # 启动 JMeter 进程
+        process = subprocess.Popen(
             jmeter_cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             universal_newlines=True,
             cwd=current_dir,
             shell=False,
-            env=env
+            env=env,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0  # Windows 下创建新进程组
         )
-
-        if result.returncode == 0:
-            return HttpResponse("success")
-        else:
-            error_msg = result.stderr if result.stderr else result.stdout
-            return HttpResponse("failed: " + error_msg)
+        
+        # 保存进程 PID 到文件，便于后续查询状态
+        with open(pid_file, 'w') as f:
+            f.write(str(process.pid))
+        
+        print(f"JMeter 进程已启动，PID: {process.pid}")
+        
+        # 立即返回成功，不等待 JMeter 完成
+        return HttpResponse("success")
     except Exception:
         traceback.print_exc()
         return HttpResponse("failed")
@@ -679,6 +700,47 @@ def showProgress(request):
             progress_total = 1
         AutotestplatInterfacePerformance.objects.filter(id=1).update(progress=progress,progress_total=progress_total)
     return HttpResponse("success")
+
+
+def getJmeterStatus(request):
+    """
+    检查JMeter进程的真实运行状态
+    返回: {"running": true/false, "progress": 当前进度秒数}
+    """
+    try:
+        pid_file = os.path.join(current_dir, 'autotest', 'jmeter.pid')
+        
+        # 读取保存的PID
+        if not os.path.exists(pid_file):
+            return HttpResponse(json.dumps({"running": False, "progress": 0}), content_type='application/json')
+        
+        with open(pid_file, 'r') as f:
+            pid = int(f.read().strip())
+        
+        # 检查进程是否还在运行
+        import psutil
+        try:
+            process = psutil.Process(pid)
+            if process.is_running() and process.status() != psutil.STATUS_ZOMBIE:
+                # 进程还在运行，计算已经运行的时间
+                create_time = process.create_time()
+                import time
+                elapsed_seconds = int(time.time() - create_time)
+                return HttpResponse(json.dumps({
+                    "running": True, 
+                    "progress": elapsed_seconds,
+                    "pid": pid
+                }), content_type='application/json')
+            else:
+                # 进程已结束
+                return HttpResponse(json.dumps({"running": False, "progress": 0}), content_type='application/json')
+        except psutil.NoSuchProcess:
+            # 进程不存在
+            return HttpResponse(json.dumps({"running": False, "progress": 0}), content_type='application/json')
+    except Exception as e:
+        traceback.print_exc()
+        # 如果psutil不可用或其他错误，返回未运行状态
+        return HttpResponse(json.dumps({"running": False, "progress": 0, "error": str(e)}), content_type='application/json')
 
 
 def start_interface_login(id1):
