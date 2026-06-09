@@ -340,7 +340,12 @@ def runWebtestcase(request,web_testcase_code):
             testcase_template_playwright(user_product_id, web_testcase_code)
     else:
         testcase_template_selenium(user_product_id, web_testcase_code)
-    return HttpResponse("运行完成。  该用例为：" + str(web_testcase_code) + "  " + "。" + "<input style='color:light blue' type='button'' name='Submit'' value='返回查看结果'' onclick='self.location=document.referrer;' />")
+    # return HttpResponse("运行完成。  该用例为：" + str(web_testcase_code) + "  " + "。" + "<input style='color:light blue' type='button'' name='Submit'' value='返回查看结果'' onclick='self.location=document.referrer;' />")
+    return HttpResponse(json.dumps({
+        'status': 'success',
+        'message': f'运行完成。该用例为：{web_testcase_code}',
+        'web_testcase_code': web_testcase_code
+    }), content_type='application/json')
 
 @csrf_exempt
 def runAllTestcase(request):
@@ -361,7 +366,12 @@ def runAllTestcase(request):
             testcase_template_playwright(user_product_id, web_testcase_code)
     else:
         testcase_template_selenium(user_product_id, web_testcase_code)
-    return HttpResponse("运行完成。  该用例为：" + str(web_testcase_code) + "  " + "。" + "<input style='color:light blue' type='button'' name='Submit'' value='返回查看结果'' onclick='self.location=document.referrer;' />")
+    # return HttpResponse("运行完成。  该用例为：" + str(web_testcase_code) + "  " + "。" + "<input style='color:light blue' type='button'' name='Submit'' value='返回查看结果'' onclick='self.location=document.referrer;' />")
+    return HttpResponse(json.dumps({
+        'status': 'success',
+        'message': f'运行完成。该用例为：{web_testcase_code}',
+        'web_testcase_code': web_testcase_code
+    }), content_type='application/json')
 
 def testcase_template_selenium(user_product_id,web_testcase_code):
     time.sleep(1)
@@ -369,6 +379,9 @@ def testcase_template_selenium(user_product_id,web_testcase_code):
     print("autotest product_id %s start..." % user_product_id )
     chrome_driver_path=r""+current_dir+"\chromedriver.exe"
     driver = webdriver.Chrome(executable_path=chrome_driver_path)
+    # 设置全局隐式等待时间
+    driver.implicitly_wait(10)
+    driver.maximize_window()
     if(web_testcase_code==''):
         sql = "SELECT id,web_testcase_findmethod,web_testcase_evelement,web_testcase_optmethod,web_testcase_testdata,web_testcase_assertdata,`web_testcase_stepresult`,web_testcase_code from autotestplat_web_testcase where autotestplat_web_testcase.product_id=" + str(user_product_id) + " ORDER BY web_testcase_code_order ASC "
         caseResultInit(user_product_id, '未执行')

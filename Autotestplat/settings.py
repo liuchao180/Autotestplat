@@ -158,3 +158,7 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERYBEAT_SCHEDULER = 'djcelery.schedulers.DatabaseScheduler'
+
+# 设置 Celery Beat 自动检测数据库变化的间隔（秒）
+# 默认是 5 分钟，设置为 10 秒可以更快生效
+# CELERYBEAT_MAX_LOOP_INTERVAL = 10
