@@ -87,15 +87,6 @@ DATABASES = {
         },
     }
 }
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.mysql',
-#         'NAME': 'autotestplat',
-#         'HOST': '127.0.0.1',
-#         'PORT': 3306,
-#         'USER': 'root',
-#         'PASSWORD': 'Liuzhichao@123'}
-# }
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -162,3 +153,11 @@ CELERYBEAT_SCHEDULER = 'djcelery.schedulers.DatabaseScheduler'
 # 设置 Celery Beat 自动检测数据库变化的间隔（秒）
 # 默认是 5 分钟，设置为 10 秒可以更快生效
 # CELERYBEAT_MAX_LOOP_INTERVAL = 10
+
+LOGIN_URL = '/autotest/login/'
+LOGIN_REDIRECT_URL = '/autotest/index/'
+LOGOUT_REDIRECT_URL = '/autotest/login/'
+
+SESSION_COOKIE_AGE = 3600  # 1 小时（60 * 60 = 3600 秒）
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # 关闭浏览器后失效
+SESSION_SAVE_EVERY_REQUEST = False  # 不刷新过期时间（固定窗口）
