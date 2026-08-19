@@ -1,0 +1,90 @@
+version: '3.3'
+
+services:
+  web:
+    build: .
+    container_name: autotest-web
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+      - mysql
+    environment:
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_NAME=autotest
+      - DB_USER=root
+      - DB_PASSWORD=Liuzhichao@123
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    networks:
+      - autotest-network
+    restart: always
+
+  worker:
+    build: .
+    container_name: autotest-worker
+    command: celery worker -A Autotestplat.celery:app --loglevel=info
+    depends_on:
+      - web
+      - redis
+      - mysql
+    environment:
+      - DB_HOST=mysql
+      - REDIS_HOST=redis
+    networks:
+      - autotest-network
+    restart: always
+
+  beat:
+    build: .
+    container_name: autotest-beat
+    command: celery beat -A Autotestplat.celery:app --loglevel=info
+    depends_on:
+      - web
+      - redis
+      - mysql
+    environment:
+      - DB_HOST=mysql
+      - REDIS_HOST=redis
+    networks:
+      - autotest-network
+    restart: always
+
+  redis:
+    image: redis:6.2-alpine
+    container_name: autotest-redis
+    ports:
+      - "6380:6379"
+    networks:
+      - autotest-network
+    restart: always
+    volumes:
+      - redis-data:/data
+
+  mysql:
+    image: mysql:5.7
+    container_name: autotest-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=Liuzhichao@123
+      - MYSQL_DATABASE=autotest
+      - MYSQL_USER=autotest
+      - MYSQL_PASSWORD=Liuzhichao@123
+      - MYSQL_ROOT_HOST=%  # 允许远程连接
+      - lower_case_table_names=1  # 忽略表名大小写
+    command: --default-authentication-plugin=mysql_native_password --sql_mode=""
+    networks:
+      - autotest-network
+    restart: always
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+networks:
+  autotest-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+  mysql-data:
