@@ -27,7 +27,12 @@ import hashlib,string
 current_dir = os.getcwd()
 logfile = os.path.join(current_dir, 'autotest', 'test_out.log')
 codefile= os.path.join(current_dir, 'autotest', 'code.jpg')
-cache = redis.Redis(host='localhost', port=6379, db=0)
+# cache = redis.Redis(host='localhost', port=6379, db=0)
+cache = redis.Redis(
+    host=os.getenv('REDIS_HOST', 'localhost'),
+    port=int(os.getenv('REDIS_PORT', 6379)),
+    db=0
+)
 session = requests.Session()
 fake = Faker("zh_CN")
 

@@ -203,7 +203,13 @@ def generateJmeterFile(request):
         print(f'【INFO】开始从Redis获取Cookie用于性能测试')
         try:
             import redis as redis_client
-            r = redis_client.Redis(host='127.0.0.1', port=6379, db=0, decode_responses=True)
+            # r = redis_client.Redis(host='127.0.0.1', port=6379, db=0, decode_responses=True)
+            r = redis_client.Redis(
+                host=os.getenv('REDIS_HOST', 'localhost'),
+                port=int(os.getenv('REDIS_PORT', 6379)),
+                db=0,
+                decode_responses=True
+            )
             cached_cookies = r.get('auto_cookies_all')
             print(f'【DEBUG】Redis中auto_cookies_all的原始值为: {cached_cookies}')
             print(f'【DEBUG】Redis中auto_cookies_all的类型为: {type(cached_cookies)}')

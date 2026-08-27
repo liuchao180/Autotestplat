@@ -73,20 +73,35 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'Autotestplat.wsgi.application'
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.mysql',
+#         'NAME': 'autotestplat',
+#         'HOST': '127.0.0.1',
+#         'PORT': 3306,
+#         'USER': 'root',
+#         'PASSWORD': 'Liuzhichao@123',
+#         'OPTIONS': {
+#             'charset': 'utf8mb4',
+#             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+#         },
+#     }
+# }
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'autotestplat',
-        'HOST': '127.0.0.1',
-        'PORT': 3306,
-        'USER': 'root',
-        'PASSWORD': 'Liuzhichao@123',
+        'NAME': os.getenv('DB_NAME', 'autotestplat'),
+        'HOST': os.getenv('DB_HOST', '127.0.0.1'),  # 本地默认 127.0.0.1，Docker 中为 mysql
+        'PORT': os.getenv('DB_PORT', '3306'),
+        'USER': os.getenv('DB_USER', 'root'),
+        'PASSWORD': os.getenv('DB_PASSWORD', 'Liuzhichao@123'),
         'OPTIONS': {
             'charset': 'utf8mb4',
             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
         },
     }
 }
+
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -119,12 +134,23 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 MEDIA_URL = "/upload/"
 MEDIA_ROOT = os.path.join(BASE_DIR,'upload')
 
+# CACHES = {
+#     'default': {
+#         'BACKEND': 'django_redis.cache.RedisCache',
+#         'LOCATION': 'redis://127.0.0.1:6379/1',
+#     },
+# }
+REDIS_HOST = os.getenv('REDIS_HOST', '127.0.0.1')
+REDIS_PORT = os.getenv('REDIS_PORT', '6379')
+REDIS_URL_BASE = f'redis://{REDIS_HOST}:{REDIS_PORT}'
+
 CACHES = {
     'default': {
         'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': 'redis://127.0.0.1:6379/1',
+        'LOCATION': f'{REDIS_URL_BASE}/1',
     },
 }
+
 REDIS_TIMEOUT=7*24*60*60
 CUBES_REDIS_TIMEOUT=60*60
 NEVER_REDIS_TIMEOUT=365*24*60*60
@@ -142,9 +168,11 @@ NEVER_REDIS_TIMEOUT=365*24*60*60
 CELERY_TIMEZONE = 'Asia/Shanghai'
 CELERY_ENABLE_UTC=False
 # BROKER_URL= 'amqp://root:root@127.0.0.1:5672/of1'   #rabbitmq
-BROKER_URL = 'redis://127.0.0.1:6379/0'
+# BROKER_URL = 'redis://127.0.0.1:6379/0'
+BROKER_URL = f'{REDIS_URL_BASE}/0'
 BROKER_TRANSPORT = 'redis'
-CELERY_RESULT_BACKEND = 'redis://127.0.0.1:6379/1'
+# CELERY_RESULT_BACKEND = 'redis://127.0.0.1:6379/1'
+CELERY_RESULT_BACKEND = f'{REDIS_URL_BASE}/1'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
